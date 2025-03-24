@@ -143,8 +143,12 @@ FrameCollectorDelegate, HTTPHandlerDelegate {
             let wsReq = HTTPWSHeader.createUpgrade(request: request, supportsCompression: framer.supportsCompression(), secKeyValue: secKeyValue)
             let data = httpHandler.convert(request: wsReq)
             transport.write(data: data, completion: {_ in })
-        case .waiting:
-            break
+        case .waiting(let error):
+            mutex.wait()
+            isConnecting = false
+            mutex.signal()
+
+            broadcast(event: .waiting(error))
         case .failed(let error):
             handleError(error)
         case .viability(let isViable):
@@ -168,6 +172,10 @@ FrameCollectorDelegate, HTTPHandlerDelegate {
             
             broadcast(event: .cancelled)
         case .peerClosed:
+            mutex.wait()
+            isConnecting = false
+            mutex.signal()
+
             broadcast(event: .peerClosed)
         }
     }
